@@ -1,0 +1,12 @@
+{
+  "name": "dca-optimise",
+  "private": true,
+  "type": "module",
+  "description": "DCA optimisé selon le drawdown d'un indice de référence — site statique + mise à jour mensuelle",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\"",
+    "update": "node scripts/update-data.mjs",
+    "serve": "node scripts/serve.mjs"
+  }
+}

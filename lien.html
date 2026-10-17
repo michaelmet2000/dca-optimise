@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr-CH">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Créer un lien · DCA optimisé</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .qr { background: #fff; padding: 12px; border-radius: 12px; width: min(260px, 100%); margin: 12px auto 4px; }
+    .qr svg { display: block; width: 100%; height: auto; }
+    .link { word-break: break-all; font-size: .9rem; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  </style>
+  <script src="vendor/qrcode.js"></script>
+  <script type="module" src="lien.js"></script>
+</head>
+<body>
+<main>
+  <h1><a href="./">← DCA optimisé</a></h1>
+
+  <section class="card">
+    <h2>Créer un lien personnalisé</h2>
+    <form id="form" autocomplete="off">
+      <label for="name">Prénom (facultatif, affiché en haut de la page)</label>
+      <input id="name" type="text" maxlength="30" placeholder="Paul">
+      <label for="budget">Budget moyen mensuel (CHF)</label>
+      <input id="budget" type="number" inputmode="numeric" min="50" max="100000" step="10" value="1200" required>
+      <label for="day">Jour d'investissement dans le mois (1 à 31)</label>
+      <input id="day" type="number" inputmode="numeric" min="1" max="31" step="1" value="25" required>
+    </form>
+    <p class="small muted">Le prénom, le budget et le jour sont écrits dans le lien lui-même. Ils ne sont enregistrés nulle part ailleurs.</p>
+  </section>
+
+  <section class="card hidden" id="result">
+    <div class="link" id="link"></div>
+    <div class="actions">
+      <button type="button" id="copy">Copier le lien</button>
+      <button type="button" class="secondary hidden" id="share">Partager…</button>
+      <a id="open" href="#" target="_blank" rel="noopener"><button type="button" class="secondary">Ouvrir</button></a>
+    </div>
+    <div class="qr" id="qr"></div>
+    <p class="small muted" style="text-align:center">QR code à scanner avec l'appareil photo du téléphone</p>
+    <h2 style="margin-top:14px">Montants pour ce budget</h2>
+    <table id="preview"></table>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,77 @@
+# Met à jour les données de l'indice et publie le site sur GitHub Pages.
+# - Du lundi au samedi à 06:30 et 12:30 UTC : ajoute les clôtures journalières terminées
+#   (le passage de 12:30 rattrape une publication tardive de la source).
+# - Manuellement : onglet Actions > « Données et site » > Run workflow.
+# - À chaque push sur main (ex. modification de config.json ou CSV manuel) : recalcule et republie.
+name: Données et site
+
+on:
+  schedule:
+    - cron: '30 6,12 * * 1-6'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # commit de data/
+  pages: write      # publication
+  id-token: write
+
+concurrency:
+  group: donnees-et-site
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    outputs:
+      update_outcome: ${{ steps.update.outcome }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Tests (calibration, paliers, parsing)
+        run: npm test
+
+      - name: Mise à jour des données
+        id: update
+        continue-on-error: true   # on publie quand même : la page signalera le retard
+        run: node scripts/update-data.mjs
+
+      - name: Commit des données
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "Aucun changement."
+          else
+            git commit -m "Données : $(node -p "const s=require('./data/state.json'); s.lastDate + ' DD ' + (s.dd*100).toFixed(2) + ' %'")"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: .
+
+  deploy:
+    needs: update
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+      # Rend le workflow rouge (et déclenche l'e-mail de GitHub) si les données sont en retard.
+      - name: Signaler un échec de mise à jour
+        if: needs.update.outputs.update_outcome == 'failure'
+        run: |
+          echo "::error::La mise à jour des données a échoué. Voir l'étape « Mise à jour des données » du job update, et le README (section 4)."
+          exit 1

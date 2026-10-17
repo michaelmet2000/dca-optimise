@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr-CH">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>DCA optimisé</title>
+  <meta name="description" content="Montant à investir ce mois-ci selon le drawdown du MSCI World">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="DCA">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+<main>
+  <h1 id="hello">DCA optimisé</h1>
+
+  <div id="banner" class="banner hidden" role="status"></div>
+
+  <!-- 1. Le montant du mois -->
+  <section class="card hero" aria-live="polite">
+    <div class="label">Ce mois-ci : investir</div>
+    <div class="amount" id="amount">…</div>
+    <div class="mode" id="mode"></div>
+    <div class="sub" id="heroSub"></div>
+  </section>
+
+  <!-- 2. Drawdown, palier, clôture utilisée, plus haut historique -->
+  <section class="card">
+    <div class="facts">
+      <div><div class="k">Drawdown</div><div class="v" id="dd">…</div></div>
+      <div><div class="k">Palier</div><div class="v" id="tier">…</div></div>
+      <div class="wide"><div class="k">Clôture utilisée</div><div id="close">…</div></div>
+      <div class="wide"><div class="k">Plus haute clôture historique</div><div id="ath">…</div></div>
+    </div>
+    <!-- 3. Jauge -->
+    <div class="gauge" id="gauge" aria-hidden="true"></div>
+  </section>
+
+  <!-- 4. Paliers recalculés pour le budget -->
+  <section class="card">
+    <h2 id="tiersTitle">Paliers pour ton budget</h2>
+    <table id="tiers"></table>
+    <p class="small muted" id="tiersNote"></p>
+  </section>
+
+  <!-- Réglages personnels -->
+  <section class="card">
+    <details id="prefsDetails">
+      <summary id="prefsSummary">Mon budget et mon jour d'investissement</summary>
+      <form id="prefsForm" autocomplete="off">
+        <div class="row">
+          <div>
+            <label for="budgetInput">Budget moyen mensuel (CHF)</label>
+            <input id="budgetInput" type="number" inputmode="numeric" min="50" max="100000" step="10" required>
+          </div>
+          <div style="flex:0 0 7.5rem">
+            <label for="dayInput">Jour du mois</label>
+            <input id="dayInput" type="number" inputmode="numeric" min="1" max="31" step="1" required>
+          </div>
+        </div>
+        <p class="small muted">Le montant se base sur la dernière clôture <em>avant</em> ton jour d'investissement.
+          Si le mois est plus court, on prend son dernier jour.</p>
+        <button type="submit">Enregistrer</button>
+      </form>
+      <p class="small muted">Mémorisé sur cet appareil uniquement. Rien n'est envoyé sur internet.</p>
+    </details>
+  </section>
+
+  <!-- 6. Capacité à prévoir -->
+  <section class="card capacity">
+    <h2>Capacité à prévoir</h2>
+    <p id="capacity"></p>
+  </section>
+
+  <!-- 5. Graphique du DD sur 10 ans -->
+  <section class="card chart">
+    <h2>Drawdown fin de mois, 10 ans</h2>
+    <div id="chart"></div>
+  </section>
+
+  <!-- 7. Pied de page -->
+  <footer>
+    <p>Drawdown calculé sur le MSCI World (prix, USD), en clôtures journalières. Les montants sont en CHF.</p>
+    <p id="source"></p>
+    <p>Information à titre indicatif, pas un conseil en investissement personnalisé. Les performances passées ne préjugent pas des performances futures.</p>
+    <p><a href="lien.html">Créer un lien personnalisé</a></p>
+  </footer>
+</main>
+</body>
+</html>
