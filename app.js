@@ -24,6 +24,8 @@ async function loadState() {
   const r = await fetch('data/state.json', { cache: 'no-cache' });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const s = await r.json();
+  // État « maintenance » (ex. changement d'indice) : aucun montant n'est affiché
+  if (s.maintenance) throw Object.assign(new Error(s.maintenance), { maintenance: true });
   // contrôle minimal : on ne montre jamais un chiffre issu d'un fichier incomplet
   for (const k of ['lastDate', 'series', 'tiers', 'nominalBudget', 'roundTo']) {
     if (s[k] == null) throw new Error(`champ « ${k} » manquant`);
@@ -101,11 +103,12 @@ function render() {
   // --- 6. capacité à prévoir ---
   const c = s.capacity;
   if (c) {
-    const r = x => Math.round(budget * x / s.roundTo) * s.roundTo;
+    const r = x => fmtCHF(Math.round(budget * x / s.roundTo) * s.roundTo);
     const mult = x => String(x).replace('.', ',');
-    $('capacity').innerHTML = `Dans les pires périodes historiques (${c.periods}), le modèle a demandé jusqu'à ` +
-      `<strong>${fmtCHF(r(c.peakMultiple))} par mois</strong> (${mult(c.peakMultiple)} × B) pendant ${c.peakYears}, ` +
-      `et <strong>≈ ${fmtCHF(r(c.longMultiple))} par mois</strong> (${mult(c.longMultiple)} × B) en moyenne pendant ${c.longYears}. ` +
+    $('capacity').innerHTML = `Dans les pires périodes historiques du ${s.index.name}, le modèle a demandé ` +
+      `<strong>${mult(c.peakMultiple)} × B par mois pendant ${c.peakDuration}</strong> (${c.peakPeriod}), soit ${r(c.peakMultiple)} par mois pour toi, ` +
+      `et <strong>≈ ${mult(c.longMultipleMin)} à ${mult(c.longMultipleMax)} × B par mois en moyenne pendant ${c.longDuration}</strong> (${c.longPeriods}), ` +
+      `soit ${r(c.longMultipleMin)} à ${r(c.longMultipleMax)} par mois. ` +
       `Assure-toi de pouvoir le financer sans toucher à ton épargne de sécurité.`;
   }
 
@@ -175,7 +178,8 @@ render();
 loadState()
   .then(s => { state = s; peaked = withPeaks(s.series.map(([date, close]) => ({ date, close })), s.priorPeak); render(); })
   .catch(err => {
-    showBanner('bad', `Impossible de charger les données (${err.message}). Aucun montant n'est affiché pour éviter un chiffre faux. Réessaie plus tard.`);
+    showBanner(err.maintenance ? 'warn' : 'bad', err.maintenance ? err.message
+      : `Impossible de charger les données (${err.message}). Aucun montant n'est affiché pour éviter un chiffre faux. Réessaie plus tard.`);
     $('amount').textContent = '—';
   });
 

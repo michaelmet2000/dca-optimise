@@ -4,105 +4,147 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
-  tierIndex, scaledAmount, tierStats, monthlyStatsMminus1, dailyTierStats, drawdownSeries, tierLabels,
-  withPeaks, monthSituation, investDateOf, previousWeekday, dailyFreshness, isWeekend, addMonths, lastWeekdayOfMonth,
+  tierIndex, scaledAmount, monthlyStatsMminus1, dailyTierStats, drawdownSeries, tierLabels,
+  withPeaks, pointBefore, monthSituation, investDateOf, previousWeekday, dailyFreshness, isWeekend, addMonths, lastWeekdayOfMonth,
 } from '../lib/model.js';
 import { parseClosesCsv, parseDailyCsv } from '../lib/parse.js';
 
 const read = p => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const exists = p => fs.existsSync(new URL('../' + p, import.meta.url));
 const config = JSON.parse(read('config.json'));
-const IDX = config.indices.msciworld;
+const IDX = config.indices.acwiimi;
 const TIERS = IDX.tiers;
-const PRIOR = IDX.priorPeak;
 const amountFor = dd => TIERS[tierIndex(dd, TIERS)].amount;
 const pct = s => s.freq.map(f => Math.round(f * 1000) / 10);
 
-// ---------- Test 1 : méthode journalière (celle de l'application) ----------
-const INVESTING = 'data/historique/MSCI_World_Historical_Data.csv';
-
-test('1. Méthode journalière, MSCI World (investing.com), jour 25, 08/2012–10/2026', () => {
-  const points = parseDailyCsv(read(INVESTING));
-  assert.equal(PRIOR.close, 1682.351441);
-  const s = dailyTierStats(points, TIERS, PRIOR, '2012-08', '2026-10', 25);
-  assert.equal(s.n, 171);
-  assert.deepEqual(s.counts, [99, 27, 37, 8, 0]);
-  assert.deepEqual(pct(s), [57.9, 15.8, 21.6, 4.7, 0.0]);
-  assert.equal(s.mean.toFixed(1), '965.0');
+test('Paliers de la config = paliers du cahier des charges (400 / 940 / 2 000 / 2 800 / 3 500)', () => {
+  assert.equal(config.activeIndex, 'acwiimi');
+  assert.deepEqual(TIERS.map(t => [t.above, t.amount]), [[-0.05, 400], [-0.10, 940], [-0.20, 2000], [-0.30, 2800], [null, 3500]]);
+  assert.equal(IDX.level, 'Price');
+  assert.equal(IDX.priorPeak, null); // l'historique couvre 2007 : plus de pic injecté
 });
 
-test('1b. Plus haute clôture du fichier = 5 034,04 le 13/08/2026', () => {
-  const peaked = withPeaks(parseDailyCsv(read(INVESTING)), PRIOR);
-  assert.equal(peaked.at(-1).peak, 5034.04);
-  assert.equal(peaked.at(-1).peakDate, '2026-08-13');
+// ---------- Test 1 : méthode journalière (celle de l'application), MSCI ACWI IMI Price ----------
+// Historique = export journalier msci.com importé dans data/history/acwiimi.csv.
+const HAS_DAILY = exists(IDX.historyFile);
+const dailyUntil = () => parseDailyCsv(read(IDX.historyFile)).filter(p => p.date <= '2026-10-16');
+
+test('1. Méthode journalière, jour 25, 02/1997–10/2026 : 1 543,7 CHF', { skip: !HAS_DAILY && `${IDX.historyFile} absent` }, () => {
+  const points = dailyUntil();
+  assert.equal(points[0].date, '1997-01-01');
+  const s = dailyTierStats(points, TIERS, null, '1997-02', '2026-10', 25);
+  assert.equal(s.n, 357);
+  assert.deepEqual(pct(s), [38.9, 14.0, 20.2, 12.6, 14.3]);
+  assert.equal(s.mean.toFixed(1), '1543.7');
 });
 
-test("1c. L'historique du repo (dimanches investing.com écartés) donne le même résultat, et n'a aucun week-end", () => {
-  const points = parseDailyCsv(read(IDX.historyFile));
-  assert.ok(points.every(p => !isWeekend(p.date)));
-  const s = dailyTierStats(points.filter(p => p.date <= '2026-10-16'), TIERS, PRIOR, '2012-08', '2026-10', 25);
-  assert.deepEqual(s.counts, [99, 27, 37, 8, 0]);
+test('1b. Points de contrôle (jour 25) et repères de la série', { skip: !HAS_DAILY && `${IDX.historyFile} absent` }, () => {
+  const peaked = withPeaks(dailyUntil(), null);
+  const at = date => peaked.find(p => p.date === date);
+  assert.equal(at('2026-10-16').close.toFixed(2), '2813.72');
+  assert.equal(peaked.at(-1).peak.toFixed(2), '2903.74');
+  assert.equal(peaked.at(-1).peakDate, '2026-08-14');
+  assert.equal(at('2007-10-31').peak.toFixed(2), '1060.07');
+  const expected = [
+    ['2008-10', '2008-10-24', '525.74', '1060.07', '-50.41', 3500],
+    ['2009-03', '2009-03-24', '509.99', '1060.07', '-51.89', 3500],
+    ['2020-04', '2020-04-24', '1186.55', '1474.25', '-19.52', 2000],
+    ['2022-10', '2022-10-24', '1456.24', '1936.44', '-24.80', 2800],
+    ['2026-10', '2026-10-16', '2813.72', '2903.74', '-3.10', 400],
+  ];
+  for (const [month, date, close, peak, dd, amount] of expected) {
+    const p = pointBefore(peaked, investDateOf(month, 25));
+    assert.deepEqual([p.date, p.close.toFixed(2), p.peak.toFixed(2), (p.dd * 100).toFixed(2), amountFor(p.dd)], [date, close, peak, dd, amount], month);
+  }
 });
 
-// ---------- Test 2 : calibration mensuelle MSCI World (fichier msci.com fourni par l'utilisateur) ----------
-const MSCI_MONTHLY = 'data/historique/MSCI_World_Price_mensuel_1997-2026.csv';
-test('2. Mensuel M−1, MSCI World Price 02/1997–09/2026 : ≈ 1 366 CHF', { skip: !exists(MSCI_MONTHLY) && `${MSCI_MONTHLY} absent` }, () => {
-  const monthly = parseClosesCsv(read(MSCI_MONTHLY));
+test('1c. Capacité à prévoir : 2,92 × B sur 2 ans (09/2001–08/2003), ≈ 2,3 à 2,4 × B sur 5–6 ans', { skip: !HAS_DAILY && `${IDX.historyFile} absent` }, () => {
+  const peaked = withPeaks(dailyUntil(), null);
+  const amounts = [];
+  for (let m = '1997-02'; m <= '2026-10'; m = addMonths(m, 1)) amounts.push([m, amountFor(pointBefore(peaked, investDateOf(m, 25)).dd)]);
+  const avg = (a, b) => { const s = amounts.filter(([m]) => m >= a && m <= b); return s.reduce((x, [, v]) => x + v, 0) / s.length / 1200; };
+  let best = 0, at = '';
+  for (let i = 0; i + 24 <= amounts.length; i++) {
+    const v = amounts.slice(i, i + 24).reduce((x, [, a]) => x + a, 0) / 24 / 1200;
+    if (v > best) { best = v; at = amounts[i][0]; }
+  }
+  const c = config.capacity;
+  assert.equal(best.toFixed(2), c.peakMultiple.toFixed(2));
+  assert.equal(at, '2001-09');
+  for (const [a, b] of [['2000-11', '2005-11'], ['2008-02', '2013-09']]) {
+    const v = avg(a, b);
+    assert.ok(v >= c.longMultipleMin - 0.05 && v <= c.longMultipleMax + 0.05, `${a}–${b} : ${v.toFixed(2)} × B`);
+  }
+});
+
+// ---------- Test 2 : calibration mensuelle MSCI ACWI IMI (fichier msci.com fourni) ----------
+test('2. Mensuel M−1, MSCI ACWI IMI Price 02/1997–09/2026 : 1 472,5 CHF', () => {
+  const monthly = parseClosesCsv(read('data/historique/MSCI_ACWI_IMI_Price_mensuel_1997-2026.csv'));
+  assert.equal(monthly[0].close, 496.462); // 496,462 et non 496 462
   const s = monthlyStatsMminus1(monthly, TIERS, '1997-02', '2026-09');
   assert.equal(s.n, 356);
-  assert.deepEqual(pct(s), [43.8, 12.9, 14.3, 15.4, 13.5]);
-  assert.ok(Math.abs(s.mean - 1366) < 1, `moyenne ${s.mean}`);
+  assert.deepEqual(pct(s), [43.3, 13.5, 16.9, 12.6, 13.8]);
+  assert.equal(s.mean.toFixed(1), '1472.5');
 });
 
-// ---------- Test 3 : calibration d'origine S&P 500 ----------
-// Clôtures de 02/1970 à 12/2024 (règle M−1 : montants de 03/1970 à 01/2025), plus haut depuis 02/1970.
-// Valeurs du cahier des charges : 48,3 / 13,1 / 20,5 / 11,4 / 6,8 % et ≈ 1 207. Elles venaient d'un calcul en
-// virgule flottante brute où 11/1979 (106,20 / 118,00 = −10,000 % exactement) tombait dans le palier 940.
-// Règle exacte validée par l'utilisateur (−10,00 % -> 1 500) : 85 mois au lieu de 86, 136 au lieu de 135.
+// ---------- Test 3 : S&P 500 mensuel, règle M−1 ----------
+// Référence du cahier des charges : 1 284,4 CHF (03/1970–12/2024) et 1 268,9 CHF (03/1970–01/2026).
+// Écart connu et validé par l'utilisateur : la référence vient d'un calcul en virgule flottante brute où
+// 11/1979 (106,20 / 118,00 = −10,000 % exactement, montant de 12/1979) tombait dans le palier 940.
+// Avec la règle exacte (−10,00 % -> 2 000) : 85 mois au lieu de 86 en −5/−10 %, 136 au lieu de 135 en −10/−20 %.
 const SP500 = exists('data/historique/SP_500_Donnees_Historiques.csv')
   ? 'data/historique/SP_500_Donnees_Historiques.csv' : 'data/historique/sp500_mensuel_investing.csv';
 
-test('3. S&P 500 mensuel 02/1970–12/2024 : ≈ 1 207 CHF', () => {
+test('3. S&P 500 mensuel M−1, 03/1970–12/2024 (règle exacte : 1 286,02 ; référence brute 1 284,4)', () => {
   const monthly = parseClosesCsv(read(SP500));
-  assert.equal(monthly[0].month, '1970-02', "l'historique commence en 02/1970");
-  const s = tierStats(monthly, TIERS, '1970-02', '2024-12');
-  assert.equal(s.n, 659);
-  assert.deepEqual(s.counts, [318, 85, 136, 75, 45]);
-  assert.deepEqual(pct(s), [48.3, 12.9, 20.6, 11.4, 6.8]);
-  assert.equal(s.mean.toFixed(2), '1207.94');
+  const s = monthlyStatsMminus1(monthly, TIERS, '1970-03', '2024-12');
+  assert.equal(s.n, 658);
+  assert.deepEqual(s.counts, [317, 85, 136, 75, 45]);
+  assert.equal(s.mean.toFixed(2), '1286.02');
+  // la seule différence avec la référence est 11/1979 : (2 000 − 940) / 658 = 1,61 CHF
+  assert.equal((s.mean - (2000 - 940) / 658).toFixed(1), '1284.4');
 });
 
-test('3b. Le seul mois S&P sur une borne exacte est 11/1979 (−10,00 %) -> palier 1 500', () => {
+test('3b. S&P 500 mensuel M−1, 03/1970–01/2026 (règle exacte : 1 270,46 ; référence brute 1 268,9)', () => {
+  const s = monthlyStatsMminus1(parseClosesCsv(read(SP500)), TIERS, '1970-03', '2026-01');
+  assert.equal(s.n, 671);
+  assert.equal(s.mean.toFixed(2), '1270.46');
+  assert.equal((s.mean - (2000 - 940) / 671).toFixed(1), '1268.9');
+});
+
+test('3c. 11/1979 est exactement à −10,00 % -> palier 2 000', () => {
   const p = drawdownSeries(parseClosesCsv(read(SP500))).find(x => x.month === '1979-11');
   assert.equal(p.close, 106.2);
   assert.equal(p.ath, 118);
   assert.equal(p.dd, -0.1);
-  assert.equal(amountFor(p.dd), 1500);
+  assert.equal(amountFor(p.dd), 2000);
 });
 
-// ---------- Bornes et mise à l'échelle ----------
+// ---------- 4. Bornes ----------
 test('4. Bornes des paliers', () => {
-  assert.equal(amountFor(-0.0499), 660);
+  assert.equal(amountFor(-0.0499), 400);
   assert.equal(amountFor(-0.05), 940);    // −5,00 % exactement -> 940
-  assert.equal(amountFor(-0.10), 1500);   // −10,00 % -> 1 500
-  assert.equal(amountFor(-0.1999), 1500);
-  assert.equal(amountFor(-0.20), 2350);
-  assert.equal(amountFor(-0.30), 2800);
-  assert.equal(amountFor(-0.45), 2800);
-  assert.equal(amountFor(0), 660);
+  assert.equal(amountFor(-0.10), 2000);   // −10,00 % -> 2 000
+  assert.equal(amountFor(-0.1999), 2000);
+  assert.equal(amountFor(-0.20), 2800);
+  assert.equal(amountFor(-0.30), 3500);
+  assert.equal(amountFor(-0.45), 3500);
+  assert.equal(amountFor(0), 400);
 });
 
 test('4b. DD calculé depuis des clôtures exactement à une borne (pas d\'erreur de virgule flottante)', () => {
   const s = drawdownSeries([100, 95, 90, 80, 70].map((close, i) => ({ month: `2000-0${i + 1}`, close })));
-  assert.deepEqual(s.map(p => amountFor(p.dd)), [660, 940, 1500, 2350, 2800]);
+  assert.deepEqual(s.map(p => amountFor(p.dd)), [400, 940, 2000, 2800, 3500]);
 });
 
+// ---------- 5. Mise à l'échelle ----------
 test('5. Mise à l\'échelle du budget, arrondi aux 10 CHF', () => {
   const scaleAll = B => TIERS.map(t => scaledAmount(t.amount, B, 1200, 10));
-  assert.deepEqual(scaleAll(1200), [660, 940, 1500, 2350, 2800]);
-  assert.deepEqual(scaleAll(600), [330, 470, 750, 1180, 1400]);   // 1 175 -> 1 180 (moitié vers le haut)
-  assert.deepEqual(scaleAll(2000), [1100, 1570, 2500, 3920, 4670]); // 1 566,67 ; 3 916,67 ; 4 666,67
-  assert.equal(scaledAmount(amountFor(-0.12), 600), 750);          // exemple du cahier des charges
+  assert.deepEqual(scaleAll(1200), [400, 940, 2000, 2800, 3500]);
+  assert.deepEqual(scaleAll(600), [200, 470, 1000, 1400, 1750]);
+  assert.deepEqual(scaleAll(2000), [670, 1570, 3330, 4670, 5830]); // 666,67 ; 1 566,67 ; 3 333,33 ; 4 666,67 ; 5 833,33
+  assert.equal(scaledAmount(amountFor(-0.12), 600), 1000);          // exemple du cahier des charges
+  assert.equal(scaledAmount(940, 750), 590);                        // 587,5 -> 590 (moitié vers le haut)
 });
 
 test('Libellés des paliers', () => {
@@ -128,20 +170,17 @@ test('Estimation avant le jour J : dernière clôture strictement avant aujourd\
   assert.equal(s.mode, 'estimate');
   assert.equal(s.investDate, '2026-10-25');
   assert.equal(s.point.date, '2026-10-16');
-  assert.equal(amountFor(s.point.dd), 1500); // −10 %
+  assert.equal(amountFor(s.point.dd), 2000); // −10 %
 });
 
 test('Montant figé à partir du jour J : dernière clôture strictement avant J', () => {
   const s = monthSituation(SERIES, '2026-10-20', 15);
   assert.equal(s.mode, 'fixed');
   assert.equal(s.point.date, '2026-10-14');   // la clôture DU 15 n'est pas utilisée
-  assert.equal(amountFor(s.point.dd), 660);   // −4 %
+  assert.equal(amountFor(s.point.dd), 400);   // −4 %
   assert.equal(s.complete, true);
-  // le jour J lui-même : toujours la veille
-  assert.equal(monthSituation(SERIES, '2026-10-15', 15).point.date, '2026-10-14');
-  // J tombe un lundi -> clôture du vendredi
-  assert.equal(monthSituation(SERIES, '2026-10-19', 19).point.date, '2026-10-16');
-  // J = 1 -> dernière clôture du mois précédent
+  assert.equal(monthSituation(SERIES, '2026-10-15', 15).point.date, '2026-10-14'); // le jour J lui-même : la veille
+  assert.equal(monthSituation(SERIES, '2026-10-19', 19).point.date, '2026-10-16'); // J un lundi -> vendredi
   assert.equal(monthSituation(withPeaks([{ date: '2026-09-30', close: 50 }, { date: '2026-10-01', close: 60 }]), '2026-10-05', 1).point.date, '2026-09-30');
 });
 
@@ -151,19 +190,16 @@ test('Montant figé mais données pas encore à jour -> complete = false', () =>
   assert.equal(s.complete, false);
 });
 
-test('Le pic injecté compte tant que la série ne le dépasse pas', () => {
-  const p = withPeaks([{ date: '2012-07-09', close: 1224.14 }], { date: '2007-10-31', close: 1682.351441 });
-  assert.equal(p[0].peak, 1682.351441);
-  assert.equal(p[0].peakDate, '2007-10-31');
-  assert.equal(p[0].dd, Math.round((1224.14 / 1682.351441 - 1) * 1e9) / 1e9);
-});
-
 test('Fraîcheur des données journalières (un jour ouvré de décalage toléré)', () => {
   assert.equal(previousWeekday('2026-10-19'), '2026-10-16');
   assert.equal(dailyFreshness('2026-10-16', '2026-10-17'), 'ok');  // samedi
   assert.equal(dailyFreshness('2026-10-16', '2026-10-19'), 'ok');  // lundi matin
   assert.equal(dailyFreshness('2026-10-16', '2026-10-20'), 'ok');  // mardi : clôture de lundi pas encore là
   assert.equal(dailyFreshness('2026-10-16', '2026-10-21'), 'late');
+});
+
+test("L'historique du repo n'a aucune date de week-end", { skip: !HAS_DAILY && `${IDX.historyFile} absent` }, () => {
+  assert.ok(parseDailyCsv(read(IDX.historyFile)).every(p => !isWeekend(p.date)));
 });
 
 test('Calcul des mois', () => {

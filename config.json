@@ -1,52 +1,36 @@
 {
   "_aide": "Seul fichier à modifier pour changer d'indice ou de paliers. Voir README, section 1.",
-  "activeIndex": "msciworld",
+  "activeIndex": "acwiimi",
   "nominalBudget": 1200,
   "roundTo": 10,
   "defaultInvestDay": 25,
   "capacity": {
-    "_aide": "Encadré « Capacité à prévoir » : multiples du budget B observés dans les pires périodes (MSCI World 1997–2026).",
-    "peakMultiple": 2.33,
-    "peakYears": "environ 2 ans",
-    "longMultiple": 1.9,
-    "longYears": "5 à 6 ans",
-    "periods": "2000–2006, 2008–2013"
+    "_aide": "Encadré « Capacité à prévoir » : multiples du budget B observés dans les pires périodes du MSCI ACWI IMI (1997–2026).",
+    "peakMultiple": 2.92,
+    "peakDuration": "2 ans",
+    "peakPeriod": "09/2001–08/2003",
+    "longMultipleMin": 2.3,
+    "longMultipleMax": 2.4,
+    "longDuration": "5 à 6 ans",
+    "longPeriods": "11/2000–11/2005 et 02/2008–09/2013"
   },
   "indices": {
-    "msciworld": {
-      "name": "MSCI World",
+    "acwiimi": {
+      "name": "MSCI ACWI IMI",
       "level": "Price",
       "currency": "USD",
-      "msciCode": "990100",
-      "yahooTicker": "^990100-USD-STRD",
-      "historyFile": "data/history/msciworld.csv",
-      "manualFile": "data/manual/msciworld.csv",
-      "_priorPeak": "Plus haute clôture Price avant le début de l'historique (09/07/2012), vérifiée sur msci.com.",
-      "priorPeak": { "date": "2007-10-31", "close": 1682.351441 },
-      "tiers": [
-        { "above": -0.05, "amount": 660 },
-        { "above": -0.10, "amount": 940 },
-        { "above": -0.20, "amount": 1500 },
-        { "above": -0.30, "amount": 2350 },
-        { "above": null, "amount": 2800 }
-      ]
-    },
-    "acwi": {
-      "name": "MSCI ACWI",
-      "level": "Price",
-      "currency": "USD",
-      "msciCode": "892400",
-      "yahooTicker": "^892400-USD-STRD",
-      "historyFile": "data/history/acwi.csv",
-      "manualFile": "data/manual/acwi.csv",
-      "_attention": "PAS EN V1. Fournir d'abord un historique fiable (CSV investing.com) et recalibrer les paliers (script de calibration).",
+      "msciCode": "664204",
+      "yahooTicker": "^664204-USD-STRD",
+      "historyFile": "data/history/acwiimi.csv",
+      "_manual": "Plan B : export .xlsx journalier de msci.com (Price, USD) ou CSV date,close, déposé sous ce nom (sans extension imposée).",
+      "manualFiles": ["data/manual/acwiimi.xlsx", "data/manual/acwiimi.csv"],
       "priorPeak": null,
       "tiers": [
-        { "above": -0.05, "amount": 660 },
+        { "above": -0.05, "amount": 400 },
         { "above": -0.10, "amount": 940 },
-        { "above": -0.20, "amount": 1500 },
-        { "above": -0.30, "amount": 2350 },
-        { "above": null, "amount": 2800 }
+        { "above": -0.20, "amount": 2000 },
+        { "above": -0.30, "amount": 2800 },
+        { "above": null, "amount": 3500 }
       ]
     }
   }

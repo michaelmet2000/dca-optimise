@@ -3,3 +3,7 @@ node_modules/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Documents de travail personnels (cahier des charges, corrections) : jamais publiés
+prompt_claude_code_dca*.md
+correction_claude_code*.md

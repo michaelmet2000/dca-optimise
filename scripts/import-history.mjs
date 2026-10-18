@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-// Crée l'historique de référence de l'indice actif à partir d'un CSV (export investing.com tel quel accepté).
-// Usage : node scripts/import-history.mjs data/historique/MSCI_World_Historical_Data.csv [--force]
+// Crée l'historique de référence de l'indice actif à partir de l'export journalier de msci.com (.xlsx,
+// niveau Price, USD) ou d'un CSV date,close.
+// Usage : node scripts/import-history.mjs "chemin/vers/export.xlsx" [--force]
 // Sans --force, refuse d'écraser un historique existant.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDailyCsv, toHistoryCsv } from '../lib/parse.js';
 import { isWeekend } from '../lib/model.js';
+import { parseMsciXlsx } from './xlsx.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [csvPath] = process.argv.slice(2).filter(a => !a.startsWith('--'));
-if (!csvPath) { console.error('Usage : node scripts/import-history.mjs <fichier.csv> [--force]'); process.exit(1); }
+const [srcPath] = process.argv.slice(2).filter(a => !a.startsWith('--'));
+if (!srcPath) { console.error('Usage : node scripts/import-history.mjs <export.xlsx | fichier.csv> [--force]'); process.exit(1); }
 
 const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8'));
 const idx = config.indices[config.activeIndex];
@@ -18,9 +20,16 @@ const out = path.join(ROOT, idx.historyFile);
 if (fs.existsSync(out) && !process.argv.includes('--force')) {
   console.error(`${idx.historyFile} existe déjà. Ajouter --force pour l'écraser.`); process.exit(1);
 }
-const all = parseDailyCsv(fs.readFileSync(path.resolve(csvPath), 'utf8'));
-// investing.com ajoute parfois des lignes datées du dimanche (cotations du matin en Asie) : ce ne sont pas des
-// clôtures officielles MSCI (calculées du lundi au vendredi). Elles sont écartées.
+
+let all;
+if (srcPath.toLowerCase().endsWith('.xlsx')) {
+  const x = parseMsciXlsx(fs.readFileSync(path.resolve(srcPath)), { expectLevel: idx.level, expectCurrency: idx.currency });
+  console.log(`Export msci.com : « ${x.indexName} », niveau ${x.level}, ${x.currency}`);
+  all = x.points;
+} else {
+  all = parseDailyCsv(fs.readFileSync(path.resolve(srcPath), 'utf8'));
+}
+// Les clôtures officielles sont calculées du lundi au vendredi : une date de week-end n'en est pas une.
 const weekend = all.filter(p => isWeekend(p.date));
 if (weekend.length > all.length / 10) { console.error('Trop de dates de week-end : format de date mal reconnu ?'); process.exit(1); }
 if (weekend.length) console.log(`${weekend.length} lignes de week-end écartées (${weekend.map(p => p.date).join(', ')})`);

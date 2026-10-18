@@ -5,8 +5,8 @@
 //          node scripts/update-data.mjs --offline  (historique + CSV manuel seulement)
 //
 // Sources pour les jours manquants :
-//   1. CSV manuel  data/manual/<indice>.csv  (plan B, prioritaire ; export investing.com tel quel accepté)
-//   2. Yahoo Finance (ticker de config.json)
+//   1. Fichier manuel  data/manual/<indice>.xlsx (export msci.com, Price) ou .csv  (plan B, prioritaire)
+//   2. Yahoo Finance (ticker de config.json) : 5 derniers jours seulement
 // Les jours déjà présents dans data/history/ ne sont jamais réécrits : ce sont les clôtures de référence.
 
 import fs from 'node:fs';
@@ -14,7 +14,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withPeaks, tierIndex, isWeekend, dailyFreshness } from '../lib/model.js';
 import { parseDailyCsv, toHistoryCsv } from '../lib/parse.js';
-import { fetchYahooDaily } from './sources.mjs';
+import { fetchYahooRecentCloses } from './sources.mjs';
+import { parseMsciXlsx } from './xlsx.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rel = p => path.join(ROOT, p);
@@ -36,7 +37,7 @@ const errors = [];
 
 // ---------- 1. Historique ----------
 if (!fs.existsSync(rel(idx.historyFile))) {
-  console.error(`[update] ERREUR : ${idx.historyFile} introuvable. Créer l'historique depuis un CSV investing.com (README, section 1).`);
+  console.error(`[update] ERREUR : ${idx.historyFile} introuvable. Créer l'historique depuis l'export msci.com (README, section 1).`);
   process.exit(1);
 }
 const history = parseDailyCsv(fs.readFileSync(rel(idx.historyFile), 'utf8'));
@@ -44,14 +45,23 @@ const lastKnown = history.at(-1).date;
 log(`historique : ${history.length} jours, ${history[0].date} -> ${lastKnown}`);
 
 // ---------- 2. Sources ----------
-const manual = fs.existsSync(rel(idx.manualFile)) ? parseDailyCsv(fs.readFileSync(rel(idx.manualFile), 'utf8')) : [];
-if (manual.length) log(`CSV manuel : ${manual.length} jours (${idx.manualFile})`);
+let manual = [];
+for (const f of idx.manualFiles ?? []) {
+  if (!fs.existsSync(rel(f))) continue;
+  try {
+    const pts = f.endsWith('.xlsx') ? parseMsciXlsx(fs.readFileSync(rel(f)), { expectLevel: idx.level, expectCurrency: idx.currency }).points
+      : parseDailyCsv(fs.readFileSync(rel(f), 'utf8'));
+    manual = manual.concat(pts);
+    log(`fichier manuel : ${pts.length} jours (${f})`);
+  } catch (e) {
+    errors.push(`fichier manuel ${f} ignoré : ${e.message}`);
+  }
+}
 
 let online = [], source = null;
 if (!OFFLINE) {
   try {
-    const from = history[Math.max(0, history.length - 15)].date; // quelques jours de recouvrement pour contrôle
-    online = await fetchYahooDaily(idx.yahooTicker, from);
+    online = await fetchYahooRecentCloses(idx.yahooTicker);
     source = `Yahoo Finance (${idx.yahooTicker})`;
     log(`Yahoo : ${online.length} jours, dernier = ${online.at(-1)?.date}`);
     // Contrôle de cohérence sur les jours déjà connus : protège contre un mauvais ticker ou une série corrompue.
@@ -72,7 +82,7 @@ if (!OFFLINE) {
 // ---------- 3. Ajout des nouveaux jours ----------
 const candidates = new Map();
 for (const p of online) candidates.set(p.date, { ...p, src: source });
-for (const p of manual) candidates.set(p.date, { ...p, src: 'CSV manuel' }); // le manuel est prioritaire
+for (const p of manual) candidates.set(p.date, { ...p, src: 'fichier manuel' }); // le manuel est prioritaire
 const fresh = [...candidates.values()]
   .filter(p => p.date > lastKnown && p.date < todayUtc && !isWeekend(p.date))
   .sort((a, b) => a.date.localeCompare(b.date));
@@ -82,11 +92,11 @@ for (const p of fresh) {
   const prev = history.at(-1);
   const holeDays = (Date.parse(p.date) - Date.parse(prev.date)) / 86400000;
   if (holeDays > MAX_HOLE_DAYS) {
-    errors.push(`trou de ${holeDays} jours entre ${prev.date} et ${p.date} : ajout arrêté, compléter avec un CSV manuel`);
+    errors.push(`trou de ${holeDays} jours entre ${prev.date} et ${p.date} : ajout arrêté, déposer un export msci.com (plan B)`);
     break;
   }
   if (Math.abs(p.close / prev.close - 1) > MAX_DAILY_MOVE) {
-    errors.push(`clôture du ${p.date} suspecte (${p.close} contre ${prev.close} la veille) : refusée, vérifier puis déposer un CSV manuel`);
+    errors.push(`clôture du ${p.date} suspecte (${p.close} contre ${prev.close} la veille) : refusée, vérifier puis déposer un export msci.com`);
     break;
   }
   history.push({ date: p.date, close: p.close });
@@ -121,7 +131,7 @@ const state = {
     lastAttemptAt: new Date().toISOString(),
     status,                          // ok | late
     source: added.length ? [...new Set(added.map(p => p.src))].join(' + ') : (source ?? 'historique du repo'),
-    sourceNote: `Historique : investing.com (MSCI World Historical Data) depuis le ${history[0].date} ; jours suivants : Yahoo Finance ou CSV manuel.`,
+    sourceNote: `Historique : export msci.com depuis le ${history[0].date} ; jours suivants : Yahoo Finance ou export msci.com déposé à la main.`,
     errors,
   },
 };

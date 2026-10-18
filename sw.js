@@ -1,7 +1,7 @@
 // Service worker minimal : l'app s'ouvre hors ligne, mais les DONNÉES passent toujours par le réseau d'abord,
 // pour ne jamais afficher un montant périmé quand une version plus récente existe.
 // Augmenter VERSION à chaque modification des fichiers de l'app.
-const VERSION = 'dca-v2';
+const VERSION = 'dca-v3';
 const SHELL = [
   './', 'index.html', 'app.js', 'style.css', 'lien.html', 'lien.js',
   'lib/model.js', 'lib/format.js', 'lib/prefs.js', 'vendor/qrcode.js',
