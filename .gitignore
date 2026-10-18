@@ -10,3 +10,7 @@ correction_claude_code*.md
 
 # Raccourcis personnels
 *.url
+
+# Exports msci.com bruts (déposés à la main, importés dans data/history/)
+exports_msci/
+/*.xlsx

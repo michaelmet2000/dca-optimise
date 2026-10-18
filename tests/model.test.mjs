@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   tierIndex, scaledAmount, monthlyStatsMminus1, dailyTierStats, drawdownSeries, tierLabels,
-  withPeaks, pointBefore, monthSituation, investDateOf, previousWeekday, dailyFreshness, isWeekend, addMonths, lastWeekdayOfMonth,
+  withPeaks, pointBefore, monthSituation, peakCoveredByHistory, investDateOf, previousWeekday, dailyFreshness, isWeekend, addMonths, lastWeekdayOfMonth,
 } from '../lib/model.js';
 import { parseClosesCsv, parseDailyCsv } from '../lib/parse.js';
 
@@ -25,11 +25,12 @@ test('Paliers de la config = paliers du cahier des charges (400 / 940 / 2 000 / 
 });
 
 // ---------- Test 1 : méthode journalière (celle de l'application), MSCI ACWI IMI Price ----------
-// Historique = export journalier msci.com importé dans data/history/acwiimi.csv.
-const HAS_DAILY = exists(IDX.historyFile);
+// Historique = exports journaliers msci.com importés dans data/history/acwiimi.csv.
+// Les tests 1 à 1c exigent l'historique complet depuis le 01/01/1997 ; sinon ils sont sautés.
+const HAS_DAILY = exists(IDX.historyFile) && parseDailyCsv(read(IDX.historyFile))[0].date === '1997-01-01';
 const dailyUntil = () => parseDailyCsv(read(IDX.historyFile)).filter(p => p.date <= '2026-10-16');
 
-test('1. Méthode journalière, jour 25, 02/1997–10/2026 : 1 543,7 CHF', { skip: !HAS_DAILY && `${IDX.historyFile} absent` }, () => {
+test('1. Méthode journalière, jour 25, 02/1997–10/2026 : 1 543,7 CHF', { skip: !HAS_DAILY && "historique journalier complet (depuis le 01/01/1997) absent" }, () => {
   const points = dailyUntil();
   assert.equal(points[0].date, '1997-01-01');
   const s = dailyTierStats(points, TIERS, null, '1997-02', '2026-10', 25);
@@ -38,7 +39,7 @@ test('1. Méthode journalière, jour 25, 02/1997–10/2026 : 1 543,7 CHF', { ski
   assert.equal(s.mean.toFixed(1), '1543.7');
 });
 
-test('1b. Points de contrôle (jour 25) et repères de la série', { skip: !HAS_DAILY && `${IDX.historyFile} absent` }, () => {
+test('1b. Points de contrôle (jour 25) et repères de la série', { skip: !HAS_DAILY && "historique journalier complet (depuis le 01/01/1997) absent" }, () => {
   const peaked = withPeaks(dailyUntil(), null);
   const at = date => peaked.find(p => p.date === date);
   assert.equal(at('2026-10-16').close.toFixed(2), '2813.72');
@@ -58,7 +59,7 @@ test('1b. Points de contrôle (jour 25) et repères de la série', { skip: !HAS_
   }
 });
 
-test('1c. Capacité à prévoir : 2,92 × B sur 2 ans (09/2001–08/2003), ≈ 2,3 à 2,4 × B sur 5–6 ans', { skip: !HAS_DAILY && `${IDX.historyFile} absent` }, () => {
+test('1c. Capacité à prévoir : 2,92 × B sur 2 ans (09/2001–08/2003), ≈ 2,3 à 2,4 × B sur 5–6 ans', { skip: !HAS_DAILY && "historique journalier complet (depuis le 01/01/1997) absent" }, () => {
   const peaked = withPeaks(dailyUntil(), null);
   const amounts = [];
   for (let m = '1997-02'; m <= '2026-10'; m = addMonths(m, 1)) amounts.push([m, amountFor(pointBefore(peaked, investDateOf(m, 25)).dd)]);
@@ -198,8 +199,18 @@ test('Fraîcheur des données journalières (un jour ouvré de décalage tolér�
   assert.equal(dailyFreshness('2026-10-16', '2026-10-21'), 'late');
 });
 
-test("L'historique du repo n'a aucune date de week-end", { skip: !HAS_DAILY && `${IDX.historyFile} absent` }, () => {
-  assert.ok(parseDailyCsv(read(IDX.historyFile)).every(p => !isWeekend(p.date)));
+test("L'historique du repo n'a aucune date de week-end, et son plus haut est bien le plus haut absolu", { skip: !exists(IDX.historyFile) && `${IDX.historyFile} absent` }, () => {
+  const points = parseDailyCsv(read(IDX.historyFile));
+  assert.ok(points.every(p => !isWeekend(p.date)));
+  const chk = peakCoveredByHistory(points, parseClosesCsv(read(IDX.monthlyReference)));
+  assert.ok(chk.ok, `fin de mois ${chk.monthBefore} = ${chk.maxBefore}`);
+});
+
+test('Garde-fou « historique trop court »', () => {
+  const monthly = [{ month: '2025-09', close: 2458 }, { month: '2026-08', close: 2873 }];
+  assert.equal(peakCoveredByHistory([{ date: '2025-10-17', close: 2500 }, { date: '2026-08-14', close: 2903.74 }], monthly).ok, true);
+  // un historique qui ne commencerait qu'en 2026-09 manquerait le plus haut d'août
+  assert.equal(peakCoveredByHistory([{ date: '2026-09-01', close: 2850 }, { date: '2026-10-16', close: 2813 }], monthly).ok, false);
 });
 
 test('Calcul des mois', () => {

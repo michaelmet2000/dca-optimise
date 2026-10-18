@@ -25,6 +25,8 @@
       "_manual": "Plan B : export .xlsx journalier de msci.com (Price, USD) ou CSV date,close, déposé sous ce nom (sans extension imposée).",
       "manualFiles": ["data/manual/acwiimi.xlsx", "data/manual/acwiimi.csv"],
       "priorPeak": null,
+      "_monthlyReference": "Clôtures de fin de mois msci.com depuis 1997 : si l'historique journalier commence tard, le job vérifie qu'aucun mois antérieur n'approche le plus haut (sinon le pic serait faux).",
+      "monthlyReference": "data/historique/MSCI_ACWI_IMI_Price_mensuel_1997-2026.csv",
       "tiers": [
         { "above": -0.05, "amount": 400 },
         { "above": -0.10, "amount": 940 },

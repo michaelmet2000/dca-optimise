@@ -12,8 +12,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withPeaks, tierIndex, isWeekend, dailyFreshness } from '../lib/model.js';
-import { parseDailyCsv, toHistoryCsv } from '../lib/parse.js';
+import { withPeaks, tierIndex, isWeekend, dailyFreshness, peakCoveredByHistory } from '../lib/model.js';
+import { parseDailyCsv, parseClosesCsv, toHistoryCsv } from '../lib/parse.js';
 import { fetchYahooRecentCloses } from './sources.mjs';
 import { parseMsciXlsx } from './xlsx.mjs';
 
@@ -105,6 +105,16 @@ for (const p of fresh) {
 if (added.length) log(`jours ajoutés : ${added.length} (${added[0].date} -> ${added.at(-1).date})`);
 
 // ---------- 4. État publié ----------
+// Garde-fou : si l'historique journalier commence tard, aucun mois antérieur ne doit approcher son plus haut.
+if (idx.monthlyReference && fs.existsSync(rel(idx.monthlyReference)) && !idx.priorPeak) {
+  const chk = peakCoveredByHistory(history, parseClosesCsv(fs.readFileSync(rel(idx.monthlyReference), 'utf8')));
+  if (!chk.ok) {
+    const msg = `historique trop court : la clôture de ${chk.monthBefore} (${chk.maxBefore}) approche le plus haut de l'historique ; importer les années antérieures`;
+    fs.writeFileSync(rel('data/state.json'), JSON.stringify({ maintenance: `Données incomplètes (${msg}). Aucun montant n'est affiché.` }) + '\n');
+    console.error(`[update] ÉCHEC : ${msg}`);
+    process.exit(1);
+  }
+}
 const peaked = withPeaks(history, idx.priorPeak);
 const last = peaked.at(-1);
 const ti = tierIndex(last.dd, idx.tiers);

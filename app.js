@@ -113,7 +113,10 @@ function render() {
   }
 
   // --- 5. graphique ---
-  renderChart(monthEndDrawdowns(peaked, 121), tiers);
+  const hist = monthEndDrawdowns(peaked, 121);
+  $('chartTitle').textContent = hist.length >= 121 ? 'Drawdown fin de mois, 10 ans'
+    : `Drawdown fin de mois depuis ${hist[0][0].slice(5, 7)}/${hist[0][0].slice(0, 4)}`;
+  renderChart(hist, tiers);
 
   // --- 7. pied de page ---
   const upd = s.update || {};
