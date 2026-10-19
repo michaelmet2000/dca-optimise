@@ -2,6 +2,7 @@
 import { scaledAmount, tierIndex, tierLabels, withPeaks, monthSituation, monthEndDrawdowns, dailyFreshness, isWeekend, investDateOf, addMonths, monthOf } from './lib/model.js';
 import { fmtCHF, fmtDD, fmtNum, fmtDate } from './lib/format.js';
 import { loadPrefs, savePrefs, parseBudget, parseDay } from './lib/prefs.js';
+import { initSuivi, render as renderSuivi } from './suivi.js';
 
 const $ = id => document.getElementById(id);
 const TIER_COLORS = ['var(--t0)', 'var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)'];
@@ -113,7 +114,8 @@ function render() {
   }
 
   // --- 5. graphique ---
-  const hist = monthEndDrawdowns(peaked, 121);
+  // Historique incomplet : avant `validFrom`, le pic (donc le DD) n'est pas sûr -> on ne l'affiche pas.
+  const hist = monthEndDrawdowns(peaked, 121).filter(([m]) => !s.validFrom || m >= s.validFrom.slice(0, 7));
   $('chartTitle').textContent = hist.length >= 121 ? 'Drawdown fin de mois, 10 ans'
     : `Drawdown fin de mois depuis ${hist[0][0].slice(5, 7)}/${hist[0][0].slice(0, 4)}`;
   renderChart(hist, tiers);
@@ -150,7 +152,8 @@ function renderChart(hist, tiers) {
   const pts = hist.map((h, i) => `${x(i).toFixed(1)},${y(h[1]).toFixed(1)}`);
   const thr = tiers.slice(0, -1).map(t => t.above).filter(v => v > minDD);
   const years = [];
-  hist.forEach((h, i) => { if (h[0].endsWith('-01') && Number(h[0].slice(0, 4)) % 2 === 0) years.push([i, h[0].slice(0, 4)]); });
+  const everyYears = hist.length > 60 ? 2 : 1; // une année sur deux au-delà de 5 ans
+  hist.forEach((h, i) => { if (h[0].endsWith('-01') && Number(h[0].slice(0, 4)) % everyYears === 0) years.push([i, h[0].slice(0, 4)]); });
   $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Drawdown de fin de mois des 10 dernières années">
     <line class="grid" x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}"/>
     ${thr.map(v => `<line class="thr" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${L - 4}" y="${y(v) + 3}" text-anchor="end">${Math.round(v * 100)}%</text>`).join('')}
@@ -167,19 +170,41 @@ $('prefsForm').addEventListener('submit', e => {
   const d = parseDay($('dayInput').value);
   if (!b) { $('budgetInput').setCustomValidity('Entre 50 et 100 000 CHF, nombre entier'); $('budgetInput').reportValidity(); return; }
   if (!d) { $('dayInput').setCustomValidity('Un jour entre 1 et 31'); $('dayInput').reportValidity(); return; }
-  savePrefs({ budget: b, day: d });
   // Retire b et j de l'adresse pour qu'un rechargement ne réimpose pas les valeurs du lien.
   const q = new URLSearchParams(location.search); q.delete('b'); q.delete('j');
   history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
-  prefs = { ...prefs, budget: b, day: d, isDefault: false };
+  setPrefs({ budget: b, day: d });
   $('prefsDetails').open = false;
-  render();
 });
 for (const id of ['budgetInput', 'dayInput']) $(id).addEventListener('input', () => $(id).setCustomValidity(''));
 
+/** Change le budget et le jour (formulaire ou import d'une sauvegarde) et rafraîchit les deux onglets. */
+function setPrefs({ budget, day }) {
+  savePrefs({ budget, day });
+  prefs = { ...prefs, budget, day, isDefault: false };
+  render();
+  renderSuivi();
+}
+
+// ---------- Onglets « Ce mois-ci » / « Mon suivi » (adresse #suivi pour ouvrir directement le suivi) ----------
+function showTab() {
+  const suivi = location.hash === '#suivi';
+  $('tabMois').classList.toggle('hidden', suivi);
+  $('tabSuivi').classList.toggle('hidden', !suivi);
+  $('tabBtnMois').setAttribute('aria-selected', String(!suivi));
+  $('tabBtnSuivi').setAttribute('aria-selected', String(suivi));
+}
+window.addEventListener('hashchange', () => { showTab(); window.scrollTo(0, 0); });
+showTab();
+
 render();
 loadState()
-  .then(s => { state = s; peaked = withPeaks(s.series.map(([date, close]) => ({ date, close })), s.priorPeak); render(); })
+  .then(s => {
+    state = s;
+    peaked = withPeaks(s.series.map(([date, close]) => ({ date, close })), s.priorPeak);
+    render();
+    initSuivi({ state, peaked, getPrefs: () => prefs, setPrefs, today: todayIso });
+  })
   .catch(err => {
     showBanner(err.maintenance ? 'warn' : 'bad', err.maintenance ? err.message
       : `Impossible de charger les données (${err.message}). Aucun montant n'est affiché pour éviter un chiffre faux. Réessaie plus tard.`);

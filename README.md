@@ -22,12 +22,16 @@ la veille du jour d'investissement et la plus haute clôture journalière jamais
 
 ```
 config.json                  indice, paliers, jour par défaut (le SEUL fichier à modifier)
-index.html, app.js           écran principal
+index.html, app.js           page unique : onglet « Ce mois-ci » (montant du mois)
+suivi.js                     onglet « Mon suivi » (saisies, indicateurs, comparaison, sauvegarde)
 lien.html, lien.js           générateur de lien + QR code
 style.css, sw.js, manifest.webmanifest, icons/   présentation, PWA
 lib/model.js                 règles métier (DD, paliers, jour J, mise à l'échelle), partagées site/job/tests
 lib/parse.js, lib/format.js  lecture des CSV, affichage suisse (1'500 CHF)
 lib/prefs.js                 budget/prénom/jour (lien ou mémoire du navigateur)
+lib/tracking.js              calculs du suivi : objectif, réserve, frais, TRI (XIRR), simulation des DCA, export/import
+lib/store.js                 stockage du suivi dans le navigateur
+lib/charts.js                graphiques SVG du suivi
 scripts/update-data.mjs      job de mise à jour
 scripts/sources.mjs          source en ligne (Yahoo Finance, 5 derniers jours)
 scripts/xlsx.mjs             lecture de l'export .xlsx de msci.com (sans dépendance)
@@ -115,8 +119,52 @@ licence. La page est en « noindex » et n'a pas vocation à être diffusée lar
 
 ## 5. Sauvegarder et restaurer son suivi
 
-*Phase 2 (onglet « Mon suivi »), pas encore livrée.* Les données de suivi resteront dans le navigateur du
-téléphone, avec un export/import JSON pour la sauvegarde et le changement d'appareil.
+L'onglet **« Mon suivi »** garde tout **dans le navigateur du téléphone** : rien n'est envoyé sur internet et
+il n'y a pas de compte. Effacer les données du navigateur, ou le perdre, efface aussi le suivi. D'où la
+sauvegarde.
+
+- **Sauvegarder** : *Mon suivi → Sauvegarde → Exporter*.
+  - Sur téléphone, la feuille de partage s'ouvre : enregistre le fichier `dca-suivi-AAAA-MM-JJ.json` dans
+    iCloud Drive ou Google Drive, ou envoie-le-toi par e-mail.
+  - Sur ordinateur, le fichier est téléchargé.
+  - La date de la dernière sauvegarde s'affiche juste au-dessus du bouton.
+- **Restaurer ou changer de téléphone** : sur le nouvel appareil, ouvre ton lien personnel, puis
+  *Mon suivi → Sauvegarde → Importer* et choisis le fichier.
+  - Le suivi de l'appareil est **remplacé**, après confirmation.
+  - Le budget et le jour d'investissement sauvegardés sont repris.
+  - Un fichier qui n'est pas une sauvegarde valide est refusé, sans rien modifier.
+
+La sauvegarde contient : la date de départ, les investissements (date, montant, frais, note), les relevés de
+valeur, ainsi que le budget, le jour et le prénom.
+
+### Ce que calcule « Mon suivi »
+
+- **Objectif** :
+  - mois écoulés N ;
+  - total investi et moyenne réelle (total / N) ;
+  - écart au budget B ;
+  - montant recommandé par le modèle ;
+  - **réserve théorique** = B × N − total investi ;
+  - mois sans saisie.
+- **Frais** : total, part de l'investi et moyenne par achat. Le TER des ETF est déjà dans la valeur du portefeuille.
+- **Performance** au dernier relevé de valeur, nette de frais :
+  - plus-value et rendement simple ;
+  - **TRI** (XIRR, année de 365 jours comme Excel), marqué « peu significatif » sous un an.
+- **Comparaison avec un DCA classique**, sur l'indice et la même période :
+  - **toi** (tes versements réels) ;
+  - le DCA **optimisé** (montants recommandés) ;
+  - le DCA **classique** (B chaque mois le jour J).
+
+  Chaque versement achète l'indice à la première clôture à partir de sa date, et le tout est valorisé à la
+  dernière clôture. Le verdict compare les **TRI**, pas les gains en CHF, puisque les montants investis
+  diffèrent. Ce n'est pas la performance de ton portefeuille réel : la simulation est en USD, hors
+  dividendes, frais et change.
+- **Mois comptés** : du premier jour d'investissement après la date de départ au mois en cours. Le mois en
+  cours n'est compté que si son jour J est passé ou s'il a déjà une saisie. Une saisie est rattachée au mois
+  de sa date.
+- **Historique incomplet** : l'historique journalier commence le 16/10/2023. Le plus haut est donc certain
+  à partir du 24/09/2024 seulement (`validFrom` dans `data/state.json`). Avant cette date, aucun montant
+  recommandé n'est calculé, et le graphique du drawdown commence là.
 
 ---
 
@@ -136,9 +184,15 @@ Le dépôt est `michaelmet2000/dca-optimise`, publié par GitHub Pages
    du cahier des charges (1 284,4 et 1 268,9) classe 11/1979, à exactement −10,00 %, dans le palier 940, à cause
    d'un arrondi en virgule flottante. La règle exacte, validée, le met dans le palier 2 000. Le test vérifie
    que c'est la seule différence.
-4. **Bornes, mise à l'échelle** (B = 600 et DD = −12 % → 1 000 CHF), **jour J** (31 février, week-end, J = 1),
+4. **Suivi** : moyenne et réserve (B = 1 000 ; 400, 400, 940, 0, 2 000, 400 → 4 140, 690,00, 1 860, 1 mois
+   manqué), 31 février, TRI de 10,0 % (−1 000 puis +1 100 un an plus tard) et 37,34 % sur un cas multi-flux.
+   Ce dernier est l'exemple de la documentation Microsoft de la fonction XIRR d'Excel :
+   −10 000 le 01/01/2008, +2 750 le 01/03/2008, +4 250 le 30/10/2008, +3 250 le 15/02/2009, +2 750 le 01/04/2009,
+   résultat 0,373362535. Le suivi teste aussi l'export puis l'import JSON (données strictement identiques)
+   et la simulation des trois DCA.
+5. **Bornes, mise à l'échelle** (B = 600 et DD = −12 % → 1 000 CHF), **jour J** (31 février, week-end, J = 1),
    estimation ou montant figé, fraîcheur des données.
-5. **Lecture des formats** français, suisse et anglais, de l'export .xlsx de msci.com (refus de Net et Gross),
+6. **Lecture des formats** français, suisse et anglais, de l'export .xlsx de msci.com (refus de Net et Gross),
    et **affichage** suisse.
 
 Le palier est choisi sur le DD exact. Le DD affiché est **tronqué** à 2 décimales : −9,996 % s'affiche

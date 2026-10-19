@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withPeaks, tierIndex, isWeekend, dailyFreshness, peakCoveredByHistory } from '../lib/model.js';
+import { withPeaks, tierIndex, isWeekend, dailyFreshness, peakCoveredByHistory, peakValidFrom } from '../lib/model.js';
 import { parseDailyCsv, parseClosesCsv, toHistoryCsv } from '../lib/parse.js';
 import { fetchYahooRecentCloses } from './sources.mjs';
 import { parseMsciXlsx } from './xlsx.mjs';
@@ -106,8 +106,11 @@ if (added.length) log(`jours ajoutés : ${added.length} (${added[0].date} -> ${a
 
 // ---------- 4. État publié ----------
 // Garde-fou : si l'historique journalier commence tard, aucun mois antérieur ne doit approcher son plus haut.
+let validFrom = null;
 if (idx.monthlyReference && fs.existsSync(rel(idx.monthlyReference)) && !idx.priorPeak) {
-  const chk = peakCoveredByHistory(history, parseClosesCsv(fs.readFileSync(rel(idx.monthlyReference), 'utf8')));
+  const monthlyRef = parseClosesCsv(fs.readFileSync(rel(idx.monthlyReference), 'utf8'));
+  validFrom = peakValidFrom(history, monthlyRef); // avant cette date, le pic (donc le DD) n'est pas sûr
+  const chk = peakCoveredByHistory(history, monthlyRef);
   if (!chk.ok) {
     const msg = `historique trop court : la clôture de ${chk.monthBefore} (${chk.maxBefore}) approche le plus haut de l'historique ; importer les années antérieures`;
     fs.writeFileSync(rel('data/state.json'), JSON.stringify({ maintenance: `Données incomplètes (${msg}). Aucun montant n'est affiché.` }) + '\n');
@@ -135,13 +138,14 @@ const state = {
   defaultInvestDay: config.defaultInvestDay,
   capacity: config.capacity,
   priorPeak: idx.priorPeak,          // pic antérieur au début de la série
+  validFrom,                         // historique incomplet : DD fiable seulement à partir de cette date (null = toujours)
   // Série journalière complète : le navigateur calcule le montant de chacun selon son jour d'investissement.
   series: history.map(p => [p.date, p.close]),
   update: {
     lastAttemptAt: new Date().toISOString(),
     status,                          // ok | late
     source: added.length ? [...new Set(added.map(p => p.src))].join(' + ') : (source ?? 'historique du repo'),
-    sourceNote: `Historique : export msci.com depuis le ${history[0].date} ; jours suivants : Yahoo Finance ou export msci.com déposé à la main.`,
+    sourceNote: `Historique : export msci.com depuis le ${history[0].date.split('-').reverse().join('/')} ; jours suivants : Yahoo Finance ou export msci.com déposé à la main.`,
     errors,
   },
 };

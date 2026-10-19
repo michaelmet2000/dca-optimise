@@ -17,74 +17,185 @@
   <script type="module" src="app.js"></script>
 </head>
 <body>
+<nav class="tabs" role="tablist">
+  <a href="#mois" role="tab" id="tabBtnMois" aria-selected="true">Ce mois-ci</a>
+  <a href="#suivi" role="tab" id="tabBtnSuivi" aria-selected="false">Mon suivi</a>
+</nav>
 <main>
   <h1 id="hello">DCA optimisé</h1>
 
   <div id="banner" class="banner hidden" role="status"></div>
 
-  <!-- 1. Le montant du mois -->
-  <section class="card hero" aria-live="polite">
-    <div class="label">Ce mois-ci : investir</div>
-    <div class="amount" id="amount">…</div>
-    <div class="mode" id="mode"></div>
-    <div class="sub" id="heroSub"></div>
-  </section>
+  <!-- ===================== Onglet 1 : Ce mois-ci ===================== -->
+  <div id="tabMois" role="tabpanel">
+    <!-- 1. Le montant du mois -->
+    <section class="card hero" aria-live="polite">
+      <div class="label">Ce mois-ci : investir</div>
+      <div class="amount" id="amount">…</div>
+      <div class="mode" id="mode"></div>
+      <div class="sub" id="heroSub"></div>
+    </section>
 
-  <!-- 2. Drawdown, palier, clôture utilisée, plus haut historique -->
-  <section class="card">
-    <div class="facts">
-      <div><div class="k">Drawdown</div><div class="v" id="dd">…</div></div>
-      <div><div class="k">Palier</div><div class="v" id="tier">…</div></div>
-      <div class="wide"><div class="k">Clôture utilisée</div><div id="close">…</div></div>
-      <div class="wide"><div class="k">Plus haute clôture historique</div><div id="ath">…</div></div>
-    </div>
-    <!-- 3. Jauge -->
-    <div class="gauge" id="gauge" aria-hidden="true"></div>
-  </section>
+    <!-- 2. Drawdown, palier, clôture utilisée, plus haut historique -->
+    <section class="card">
+      <div class="facts">
+        <div><div class="k">Drawdown</div><div class="v" id="dd">…</div></div>
+        <div><div class="k">Palier</div><div class="v" id="tier">…</div></div>
+        <div class="wide"><div class="k">Clôture utilisée</div><div id="close">…</div></div>
+        <div class="wide"><div class="k">Plus haute clôture historique</div><div id="ath">…</div></div>
+      </div>
+      <!-- 3. Jauge -->
+      <div class="gauge" id="gauge" aria-hidden="true"></div>
+    </section>
 
-  <!-- 4. Paliers recalculés pour le budget -->
-  <section class="card">
-    <h2 id="tiersTitle">Paliers pour ton budget</h2>
-    <table id="tiers"></table>
-    <p class="small muted" id="tiersNote"></p>
-  </section>
+    <!-- 4. Paliers recalculés pour le budget -->
+    <section class="card">
+      <h2 id="tiersTitle">Paliers pour ton budget</h2>
+      <table id="tiers"></table>
+      <p class="small muted" id="tiersNote"></p>
+    </section>
 
-  <!-- Réglages personnels -->
-  <section class="card">
-    <details id="prefsDetails">
-      <summary id="prefsSummary">Mon budget et mon jour d'investissement</summary>
-      <form id="prefsForm" autocomplete="off">
-        <div class="row">
-          <div>
-            <label for="budgetInput">Budget moyen mensuel (CHF)</label>
-            <input id="budgetInput" type="number" inputmode="numeric" min="50" max="100000" step="10" required>
+    <!-- Réglages personnels -->
+    <section class="card">
+      <details id="prefsDetails">
+        <summary id="prefsSummary">Mon budget et mon jour d'investissement</summary>
+        <form id="prefsForm" autocomplete="off">
+          <div class="row">
+            <div>
+              <label for="budgetInput">Budget moyen mensuel (CHF)</label>
+              <input id="budgetInput" type="number" inputmode="numeric" min="50" max="100000" step="10" required>
+            </div>
+            <div style="flex:0 0 7.5rem">
+              <label for="dayInput">Jour du mois</label>
+              <input id="dayInput" type="number" inputmode="numeric" min="1" max="31" step="1" required>
+            </div>
           </div>
-          <div style="flex:0 0 7.5rem">
-            <label for="dayInput">Jour du mois</label>
-            <input id="dayInput" type="number" inputmode="numeric" min="1" max="31" step="1" required>
-          </div>
-        </div>
-        <p class="small muted">Le montant se base sur la dernière clôture <em>avant</em> ton jour d'investissement.
-          Si le mois est plus court, on prend son dernier jour.</p>
-        <button type="submit">Enregistrer</button>
+          <p class="small muted">Le montant se base sur la dernière clôture <em>avant</em> ton jour d'investissement.
+            Si le mois est plus court, on prend son dernier jour.</p>
+          <button type="submit">Enregistrer</button>
+        </form>
+        <p class="small muted">Mémorisé sur cet appareil uniquement. Rien n'est envoyé sur internet.</p>
+      </details>
+    </section>
+
+    <!-- 6. Capacité à prévoir -->
+    <section class="card capacity">
+      <h2>Capacité à prévoir</h2>
+      <p id="capacity"></p>
+    </section>
+
+    <!-- 5. Graphique du DD -->
+    <section class="card chart">
+      <h2 id="chartTitle">Drawdown fin de mois, 10 ans</h2>
+      <div id="chart"></div>
+    </section>
+  </div>
+
+  <!-- ===================== Onglet 2 : Mon suivi ===================== -->
+  <div id="tabSuivi" role="tabpanel" class="hidden">
+    <div id="suiviStorageWarn" class="banner bad hidden">Ce navigateur ne permet pas d'enregistrer des données
+      (navigation privée ?). Ton suivi ne sera pas conservé.</div>
+
+    <!-- Démarrage du suivi -->
+    <section class="card hidden" id="suiviSetup">
+      <h2>Commencer mon suivi</h2>
+      <p class="small">Indique la date de départ de ton DCA. Ton budget et ton jour d'investissement sont ceux de
+        l'onglet « Ce mois-ci ».</p>
+      <form id="setupForm" autocomplete="off">
+        <label for="startInput">Date de départ</label>
+        <input id="startInput" type="date" required>
+        <button type="submit" class="mt">Commencer</button>
       </form>
-      <p class="small muted">Mémorisé sur cet appareil uniquement. Rien n'est envoyé sur internet.</p>
-    </details>
-  </section>
+    </section>
 
-  <!-- 6. Capacité à prévoir -->
-  <section class="card capacity">
-    <h2>Capacité à prévoir</h2>
-    <p id="capacity"></p>
-  </section>
+    <div id="suiviMain" class="hidden">
+      <!-- Résumé + prochain investissement -->
+      <section class="card">
+        <div class="next" id="nextInvest"></div>
+        <p class="small muted" id="suiviParams"></p>
+        <div class="actions">
+          <button type="button" id="btnAddInv">+ Investissement</button>
+          <button type="button" class="secondary" id="btnAddVal">+ Relevé de valeur</button>
+        </div>
+      </section>
 
-  <!-- 5. Graphique du DD sur 10 ans -->
-  <section class="card chart">
-    <h2 id="chartTitle">Drawdown fin de mois, 10 ans</h2>
-    <div id="chart"></div>
-  </section>
+      <!-- Respect de l'objectif -->
+      <section class="card">
+        <h2>Respect de l'objectif</h2>
+        <div class="kpis" id="kpiObjective"></div>
+        <p class="small muted" id="missedList"></p>
+      </section>
 
-  <!-- 7. Pied de page -->
+      <!-- Comparaison des DCA -->
+      <section class="card" id="compareCard">
+        <h2>Comparaison avec un DCA classique</h2>
+        <div id="compare"></div>
+        <p class="small muted">Simulation sur l'indice de référence en USD, hors dividendes, frais et change. Ce n'est
+          pas la performance de ton portefeuille réel.</p>
+      </section>
+
+      <!-- Performance -->
+      <section class="card">
+        <h2>Performance</h2>
+        <div id="perf"></div>
+      </section>
+
+      <!-- Frais -->
+      <section class="card">
+        <h2>Frais</h2>
+        <div class="kpis" id="kpiFees"></div>
+        <p class="small muted">Les frais courants des ETF (TER) sont déjà inclus dans la valeur du portefeuille et ne
+          sont pas à saisir ici.</p>
+      </section>
+
+      <!-- Graphiques -->
+      <section class="card chart">
+        <h2>Investi cumulé</h2>
+        <div id="chartCumul"></div>
+      </section>
+      <section class="card chart">
+        <h2>Valeur du portefeuille</h2>
+        <div id="chartValue"></div>
+      </section>
+
+      <!-- Tableau mensuel -->
+      <section class="card">
+        <details>
+          <summary id="monthlySummary">Détail mois par mois</summary>
+          <div class="scroll-x"><table id="monthlyTable" class="compact"></table></div>
+          <p class="small muted">≈ : estimation, la clôture de la veille du jour d'investissement n'est pas encore connue.</p>
+        </details>
+      </section>
+
+      <!-- Saisies -->
+      <section class="card">
+        <details id="entriesDetails">
+          <summary id="entriesSummary">Mes saisies</summary>
+          <h3>Investissements</h3>
+          <ul class="entries" id="invList"></ul>
+          <h3>Relevés de valeur</h3>
+          <ul class="entries" id="valList"></ul>
+          <button type="button" class="link" id="btnEditStart">Modifier la date de départ</button>
+        </details>
+      </section>
+    </div>
+
+    <!-- Sauvegarde -->
+    <section class="card">
+      <h2>Sauvegarde</h2>
+      <p><strong>Tes données restent sur ce téléphone. Exporte une sauvegarde régulièrement.</strong></p>
+      <p class="small muted" id="lastExport"></p>
+      <div class="actions">
+        <button type="button" id="btnExport">Exporter</button>
+        <label class="button secondary" for="importInput">Importer</label>
+        <input type="file" id="importInput" accept="application/json,.json" class="hidden">
+      </div>
+      <p class="small muted">L'export crée un fichier à garder (iCloud, Google Drive, e-mail…). Pour changer de
+        téléphone : exporte ici, puis importe le fichier sur le nouvel appareil.</p>
+    </section>
+  </div>
+
+  <!-- Pied de page -->
   <footer>
     <p>Drawdown calculé sur le MSCI ACWI IMI (prix, USD), en clôtures journalières. Les montants sont en CHF.</p>
     <p id="source"></p>
@@ -92,5 +203,41 @@
     <p><a href="lien.html">Créer un lien personnalisé</a></p>
   </footer>
 </main>
+
+<!-- Saisie d'un investissement -->
+<dialog id="invDialog">
+  <form id="invForm" method="dialog" autocomplete="off">
+    <h2 id="invTitle">Nouvel investissement</h2>
+    <label for="invDate">Date</label>
+    <input id="invDate" type="date" required>
+    <label for="invAmount">Montant investi (CHF)</label>
+    <input id="invAmount" type="number" inputmode="decimal" min="0" step="0.01" required>
+    <p class="small muted" id="invHint"></p>
+    <label for="invFees">Frais (CHF) : courtage, change, timbre…</label>
+    <input id="invFees" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
+    <label for="invNote">Note (facultatif)</label>
+    <input id="invNote" type="text" maxlength="80" placeholder="ex. SPYI">
+    <div class="actions">
+      <button type="submit" value="save">Enregistrer</button>
+      <button type="button" class="secondary" data-close>Annuler</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Saisie d'un relevé de valeur -->
+<dialog id="valDialog">
+  <form id="valForm" method="dialog" autocomplete="off">
+    <h2 id="valTitle">Nouveau relevé de valeur</h2>
+    <p class="small muted">Valeur totale du portefeuille, lue sur le relevé de ton courtier.</p>
+    <label for="valDate">Date</label>
+    <input id="valDate" type="date" required>
+    <label for="valValue">Valeur totale (CHF)</label>
+    <input id="valValue" type="number" inputmode="decimal" min="0" step="0.01" required>
+    <div class="actions">
+      <button type="submit" value="save">Enregistrer</button>
+      <button type="button" class="secondary" data-close>Annuler</button>
+    </div>
+  </form>
+</dialog>
 </body>
 </html>
