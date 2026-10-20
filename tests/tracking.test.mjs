@@ -54,11 +54,12 @@ test('7f. Export puis import JSON -> données strictement identiques', () => {
     prefs: { budget: 1200, day: 25, name: 'Zoé' },
     suivi: {
       startDate: '2026-10-01',
+      products: [{ id: 'p1', name: 'SPYI', pct: 90 }, { id: 'p2', name: 'EIMI', pct: 10 }],
       investments: [
-        { id: 'a1', date: '2026-10-26', amount: 400, fees: 4.95, note: 'SPYI « accumulant »' },
-        { id: 'a2', date: '2026-11-25', amount: 940, fees: 0, note: '' },
+        { id: 'a1', date: '2026-10-26', fees: 4.95, note: 'ordre « au marché »', lines: [{ productId: 'p1', amount: 360 }, { productId: 'p2', amount: 40 }] },
+        { id: 'a2', date: '2026-11-25', fees: 0, note: '', lines: [{ productId: 'p1', amount: 846 }, { productId: 'p2', amount: 94 }] },
       ],
-      valuations: [{ id: 'v1', date: '2026-11-30', value: 1385.4 }],
+      valuations: [{ id: 'v1', date: '2026-11-30', lines: [{ productId: 'p1', value: 1250.4 }, { productId: 'p2', value: 135 }] }],
     },
   };
   const back = importData(exportData(data));
@@ -66,11 +67,25 @@ test('7f. Export puis import JSON -> données strictement identiques', () => {
   assert.equal(exportData(back, new Date(0)), exportData(data, new Date(0)));
 });
 
+test('7f bis. Une sauvegarde de l\'ancien format (version 1) est convertie : montants au premier produit', () => {
+  const v1 = JSON.stringify({ app: 'dca-optimise', version: 1, prefs: { budget: 1200, day: 25 }, suivi: {
+    startDate: '2026-10-01', investments: [{ id: 'a1', date: '2026-10-26', amount: 400, fees: 5, note: '' }],
+    valuations: [{ id: 'v1', date: '2026-10-31', value: 410 }] } });
+  const { suivi } = importData(v1);
+  assert.deepEqual(suivi.products, [{ id: 'p1', name: 'Mon ETF', pct: 100 }]);
+  assert.deepEqual(suivi.investments[0].lines, [{ productId: 'p1', amount: 400 }]);
+  assert.deepEqual(suivi.valuations[0].lines, [{ productId: 'p1', value: 410 }]);
+});
+
 test('7g. Import refusé si le fichier n\'est pas une sauvegarde valide', () => {
   assert.throws(() => importData('pas du json'), /JSON/);
   assert.throws(() => importData('{"app":"autre"}'), /sauvegarde/);
   assert.throws(() => importData(JSON.stringify({ app: 'dca-optimise', version: 1, suivi: { investments: [{ id: 'x', date: '2026-13-01', amount: 1 }] } })), /invalide/);
   assert.throws(() => importData(JSON.stringify({ app: 'dca-optimise', version: 1, suivi: { investments: [{ id: 'x', date: '2026-10-01', amount: -5 }] } })), /invalide/);
+  // version 2 : produit inconnu, ou pourcentages qui ne font pas 100 %
+  const v2 = suivi => JSON.stringify({ app: 'dca-optimise', version: 2, suivi });
+  assert.throws(() => importData(v2({ products: [{ id: 'p1', name: 'A', pct: 100 }], investments: [{ id: 'x', date: '2026-10-01', fees: 0, lines: [{ productId: 'zz', amount: 5 }] }], valuations: [] })), /invalide/);
+  assert.throws(() => importData(v2({ products: [{ id: 'p1', name: 'A', pct: 60 }], investments: [], valuations: [] })), /100/);
 });
 
 test('Mois suivis : départ, jour J passé ou non, mois en cours', () => {

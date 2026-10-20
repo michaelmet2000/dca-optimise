@@ -29,8 +29,12 @@
       <input id="budget" type="number" inputmode="numeric" min="50" max="100000" step="10" value="1200" required>
       <label for="day">Jour d'investissement dans le mois (1 à 31)</label>
       <input id="day" type="number" inputmode="numeric" min="1" max="31" step="1" value="25" required>
+      <label>Son portefeuille (facultatif) : produits et part cible</label>
+      <div id="pf"></div>
+      <p class="small muted" id="pfHint">Laisse vide si la personne le saisira elle-même dans « Mon suivi ».</p>
     </form>
-    <p class="small muted">Le prénom, le budget et le jour sont écrits dans le lien lui-même. Ils ne sont enregistrés nulle part ailleurs.</p>
+    <p class="small muted">Le prénom, le budget, le jour et le portefeuille sont écrits dans le lien lui-même. Ils ne sont
+      enregistrés nulle part ailleurs. Le drawdown est toujours calculé sur le MSCI ACWI IMI.</p>
   </section>
 
   <section class="card hidden" id="result">

@@ -2,7 +2,8 @@
 import { scaledAmount, tierIndex, tierLabels, withPeaks, monthSituation, monthEndDrawdowns, dailyFreshness, isWeekend, investDateOf, addMonths, monthOf } from './lib/model.js';
 import { fmtCHF, fmtDD, fmtNum, fmtDate } from './lib/format.js';
 import { loadPrefs, savePrefs, parseBudget, parseDay } from './lib/prefs.js';
-import { initSuivi, render as renderSuivi } from './suivi.js';
+import { initSuivi, render as renderSuivi, getProducts } from './suivi.js';
+import { splitAmount } from './lib/portfolio.js';
 
 const $ = id => document.getElementById(id);
 const TIER_COLORS = ['var(--t0)', 'var(--t1)', 'var(--t2)', 'var(--t3)', 'var(--t4)'];
@@ -17,6 +18,7 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 const shortDate = iso => fmtDate(iso).slice(0, 5); // "16/10"
+const escHtml = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const weekdayOf = iso => WEEKDAYS[new Date(iso + 'T00:00:00Z').getUTCDay()];
 /** "le 25/10/2026", avec la mention « prochain jour ouvrable » si c'est un week-end. */
 const investLabel = iso => `le ${fmtDate(iso)}` + (isWeekend(iso) ? ` (${weekdayOf(iso)} : prochain jour ouvrable)` : '');
@@ -73,6 +75,11 @@ function render() {
   // --- 1. montant ---
   $('amount').textContent = fmtCHF(amounts[ti]);
   $('amount').classList.toggle('stale', provisional);
+  // Répartition entre les produits du portefeuille (définis dans « Mon suivi » ou par le lien)
+  const products = getProducts();
+  $('split').classList.toggle('hidden', products.length < 2);
+  $('split').innerHTML = products.length < 2 ? '' : 'À répartir : ' + splitAmount(amounts[ti], products)
+    .map(l => `${escHtml(products.find(p => p.id === l.productId).name)} <strong>${fmtCHF(l.amount)}</strong>`).join(' · ');
   const nextMonthDate = investDateOf(addMonths(monthOf(today), 1), day);
   if (sit.mode === 'estimate') {
     $('mode').textContent = `Estimation si tu investissais aujourd'hui (clôture du ${shortDate(p.date)})`;
@@ -203,7 +210,7 @@ loadState()
     state = s;
     peaked = withPeaks(s.series.map(([date, close]) => ({ date, close })), s.priorPeak);
     render();
-    initSuivi({ state, peaked, getPrefs: () => prefs, setPrefs, today: todayIso });
+    initSuivi({ state, peaked, getPrefs: () => prefs, setPrefs, today: todayIso, onProductsChange: render });
   })
   .catch(err => {
     showBanner(err.maintenance ? 'warn' : 'bad', err.maintenance ? err.message

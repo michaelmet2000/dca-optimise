@@ -160,5 +160,19 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 dialog h2 { margin-top: 0; }
 input[type=date] { width: 100%; font: inherit; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); min-height: 46px; }
 
+/* Répartition entre produits sous le montant du mois */
+.hero .split { font-size: .95rem; margin: 2px 0 8px; }
+
+/* Éditeur de portefeuille : une ligne par produit (nom, %, retirer) */
+.pf-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.pf-row input[type=text] { flex: 1 1 auto; min-width: 0; }
+.pf-row input[type=number] { flex: 0 0 5.2rem; text-align: right; }
+.pf-unit { color: var(--muted); }
+.pf-row button.link { padding: 6px 8px; font-size: 1rem; }
+button:disabled { opacity: .35; cursor: not-allowed; }
+.pf-foot { display: flex; justify-content: space-between; align-items: center; }
+.pf-error:empty, .total-line:empty { display: none; }
+.total-line { font-weight: 650; margin: 10px 0 0; }
+
 footer { font-size: .8rem; color: var(--muted); padding: 8px 4px; }
 footer p { margin: 6px 0; }

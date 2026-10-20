@@ -32,6 +32,9 @@ lib/prefs.js                 budget/prénom/jour (lien ou mémoire du navigateur
 lib/tracking.js              calculs du suivi : objectif, réserve, frais, TRI (XIRR), simulation des DCA, export/import
 lib/store.js                 stockage du suivi dans le navigateur
 lib/charts.js                graphiques SVG du suivi
+lib/portfolio.js             portefeuille par produit : parts cibles, répartition du montant, performance par produit
+lib/pfeditor.js              éditeur de portefeuille (produits + %), partagé par le suivi et le générateur de lien
+lib/xirr.js                  TRI (XIRR, convention Excel)
 scripts/update-data.mjs      job de mise à jour
 scripts/sources.mjs          source en ligne (Yahoo Finance, 5 derniers jours)
 scripts/xlsx.mjs             lecture de l'export .xlsx de msci.com (sans dépendance)
@@ -71,8 +74,26 @@ modifies ces paliers.
 
 ## 2. Générer un lien pour quelqu'un
 
-Ouvre `…/lien.html`, ou le lien « Créer un lien personnalisé » en bas de la page. Saisis le prénom, le
-budget moyen et le jour d'investissement. Tu obtiens le lien, les boutons « Copier » et « Partager », et un QR code.
+Ouvre `…/lien.html`, ou le lien « Créer un lien personnalisé » en bas de la page. Saisis :
+- le prénom ;
+- le budget moyen ;
+- le jour d'investissement ;
+- le portefeuille de la personne (facultatif) : ses produits et leur part cible, par exemple SPYI 90 % et EIMI 10 %.
+
+Tu obtiens le lien, les boutons « Copier » et « Partager », et un QR code. L'aperçu montre le montant de chaque
+palier pour son budget, et sa répartition par produit.
+
+Exemple : `…/?b=500&j=10&n=Paul&p=SPYI:90,EIMI:10`.
+
+**Ce qui change d'une personne à l'autre**
+- **Le budget** : les paliers sont mis à l'échelle de ton budget de référence (1 200 CHF). Pour un budget de
+  500 CHF, on obtient 170 / 390 / 830 / 1 170 / 1 460 CHF.
+- **Le jour d'investissement.**
+- **Les produits suivis.**
+
+**Ce qui ne change jamais : le drawdown est toujours celui du MSCI ACWI IMI.** Le portefeuille sert seulement à
+répartir le montant et à suivre chaque produit. Tant que la personne n'a fait aucune saisie, le portefeuille
+du lien remplace le sien ; ensuite, il se modifie dans « Mon suivi ».
 
 Le lien est mémorisé sur le téléphone de la personne : l'icône ajoutée à l'écran d'accueil garde ses
 réglages. Sans lien, la page utilise 1 200 CHF et le 25, modifiables dans « Mon budget et mon jour
@@ -134,8 +155,8 @@ sauvegarde.
   - Le budget et le jour d'investissement sauvegardés sont repris.
   - Un fichier qui n'est pas une sauvegarde valide est refusé, sans rien modifier.
 
-La sauvegarde contient : la date de départ, les investissements (date, montant, frais, note), les relevés de
-valeur, ainsi que le budget, le jour et le prénom.
+La sauvegarde contient : la date de départ, le portefeuille (produits et parts), les investissements (date,
+montant par produit, frais, note), les relevés de valeur (valeur par produit), ainsi que le budget, le jour et le prénom.
 
 ### Ce que calcule « Mon suivi »
 
@@ -146,7 +167,13 @@ valeur, ainsi que le budget, le jour et le prénom.
   - montant recommandé par le modèle ;
   - **réserve théorique** = B × N − total investi ;
   - mois sans saisie.
+- **Portefeuille** :
+  - chaque produit avec sa part cible et sa part réelle au dernier relevé (en rouge si l'écart dépasse 5 points) ;
+  - le montant du mois est réparti selon les parts cibles, arrondi au franc, la somme restant exacte ;
+  - un produit déjà utilisé dans une saisie peut être renommé, pas supprimé.
 - **Frais** : total, part de l'investi et moyenne par achat. Le TER des ETF est déjà dans la valeur du portefeuille.
+- **Performance par produit** (si plusieurs produits) : investi, valeur, plus-value et TRI de chacun, à son
+  dernier relevé. Les frais d'un achat sont répartis entre ses produits au prorata des montants.
 - **Performance** au dernier relevé de valeur, nette de frais :
   - plus-value et rendement simple ;
   - **TRI** (XIRR, année de 365 jours comme Excel), marqué « peu significatif » sous un an.

@@ -33,6 +33,7 @@
       <div class="label">Ce mois-ci : investir</div>
       <div class="amount" id="amount">…</div>
       <div class="mode" id="mode"></div>
+      <div class="split hidden" id="split"></div>
       <div class="sub" id="heroSub"></div>
     </section>
 
@@ -99,12 +100,16 @@
     <!-- Démarrage du suivi -->
     <section class="card hidden" id="suiviSetup">
       <h2>Commencer mon suivi</h2>
-      <p class="small">Indique la date de départ de ton DCA. Ton budget et ton jour d'investissement sont ceux de
-        l'onglet « Ce mois-ci ».</p>
+      <p class="small">Indique la date de départ de ton DCA et les produits que tu achètes, avec leur part cible.
+        Ton budget et ton jour d'investissement sont ceux de l'onglet « Ce mois-ci ».</p>
       <form id="setupForm" autocomplete="off">
         <label for="startInput">Date de départ</label>
         <input id="startInput" type="date" required>
-        <button type="submit" class="mt">Commencer</button>
+        <div id="setupPfBlock">
+          <label>Mon portefeuille (produits et part cible)</label>
+          <div id="setupPf"></div>
+        </div>
+        <button type="submit" class="mt" id="setupSubmit">Commencer</button>
       </form>
     </section>
 
@@ -117,6 +122,13 @@
           <button type="button" id="btnAddInv">+ Investissement</button>
           <button type="button" class="secondary" id="btnAddVal">+ Relevé de valeur</button>
         </div>
+      </section>
+
+      <!-- Portefeuille : produits, part cible et part réelle -->
+      <section class="card">
+        <h2>Mon portefeuille</h2>
+        <div id="pfView"></div>
+        <button type="button" class="link" id="btnEditPf">Modifier les produits et les parts</button>
       </section>
 
       <!-- Respect de l'objectif -->
@@ -138,6 +150,7 @@
       <section class="card">
         <h2>Performance</h2>
         <div id="perf"></div>
+        <div id="perfProducts"></div>
       </section>
 
       <!-- Frais -->
@@ -210,9 +223,9 @@
     <h2 id="invTitle">Nouvel investissement</h2>
     <label for="invDate">Date</label>
     <input id="invDate" type="date" required>
-    <label for="invAmount">Montant investi (CHF)</label>
-    <input id="invAmount" type="number" inputmode="decimal" min="0" step="0.01" required>
     <p class="small muted" id="invHint"></p>
+    <div id="invLines"></div>
+    <p class="total-line" id="invTotal"></p>
     <label for="invFees">Frais (CHF) : courtage, change, timbre…</label>
     <input id="invFees" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
     <label for="invNote">Note (facultatif)</label>
@@ -228,11 +241,25 @@
 <dialog id="valDialog">
   <form id="valForm" method="dialog" autocomplete="off">
     <h2 id="valTitle">Nouveau relevé de valeur</h2>
-    <p class="small muted">Valeur totale du portefeuille, lue sur le relevé de ton courtier.</p>
+    <p class="small muted">Valeur de chaque ligne, lue sur le relevé de ton courtier (en CHF).</p>
     <label for="valDate">Date</label>
     <input id="valDate" type="date" required>
-    <label for="valValue">Valeur totale (CHF)</label>
-    <input id="valValue" type="number" inputmode="decimal" min="0" step="0.01" required>
+    <div id="valLines"></div>
+    <p class="total-line" id="valTotal"></p>
+    <div class="actions">
+      <button type="submit" value="save">Enregistrer</button>
+      <button type="button" class="secondary" data-close>Annuler</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Portefeuille : produits et part cible -->
+<dialog id="pfDialog">
+  <form id="pfForm" method="dialog" autocomplete="off">
+    <h2>Mon portefeuille</h2>
+    <p class="small muted">Produits que tu achètes et leur part cible (total 100 %). Le montant de chaque mois est
+      réparti selon ces parts. Un produit déjà utilisé dans tes saisies peut être renommé, pas supprimé.</p>
+    <div id="dlgPf"></div>
     <div class="actions">
       <button type="submit" value="save">Enregistrer</button>
       <button type="button" class="secondary" data-close>Annuler</button>
